@@ -139,13 +139,14 @@ def build_network(gas_price):
     return n
 
 
-caps_det = pd.DataFrame(index=SCENARIOS, columns=TECH.keys(), dtype=float)
-objs_det = pd.Series(index=SCENARIOS, dtype=float)
+caps_det = pd.DataFrame(index=SCENARIOS, columns=TECH.keys())
+objs_det = pd.Series(index=SCENARIOS)
+
 for sc in SCENARIOS:
-    net = build_network(GAS_PRICES[sc])
-    net.optimize(solver_name=SOLVER)
-    caps_det.loc[sc] = net.generators.p_nom_opt
-    objs_det.loc[sc] = net.objective
+    n = build_network(GAS_PRICES[sc])
+    n.optimize(solver_name=SOLVER)
+    caps_det.loc[sc] = n.generators.p_nom_opt
+    objs_det.loc[sc] = n.objective
 
 # Step 4: Plot Deterministic Results
 plot_capacity(caps_det, title="Deterministic Capacity Mix")
@@ -163,10 +164,10 @@ for sc in SCENARIOS:
         n_stoch.generators.loc[idx, "marginal_cost"] = (
             GAS_PRICES[sc] / n_stoch.generators.loc[idx, "efficiency"]
         )
-net_stoch = n_stoch
-net_stoch.optimize(solver_name=SOLVER)
-caps_api = net_stoch.generators.p_nom_opt.xs("med", level="scenario")
-obj_api = net_stoch.objective
+
+n_stoch.optimize(solver_name=SOLVER)
+caps_api = n_stoch.generators.p_nom_opt.xs("med", level="scenario")
+obj_api = n_stoch.objective
 
 # Step 6: Plot API Stochastic Results
 caps_all = caps_det.copy()
@@ -227,20 +228,13 @@ add_stochastic(n_manual_stoch)
 n_manual_stoch.optimize.solve_model(solver_name=SOLVER)
 caps_manual_stoch = n_manual_stoch.generators.p_nom_opt
 obj_manual_stoch = n_manual_stoch.objective
+
 print("Manual Stochastic Capacities (MW):", caps_manual_stoch)
 print("Manual Stochastic Objective:", obj_manual_stoch)
 
 # Step 8: Plot Final Comparison Results
 caps_final_comparison = caps_det.copy()
-if (
-    isinstance(net_stoch.generators.p_nom_opt.index, pd.MultiIndex)
-    and "scenario" in net_stoch.generators.p_nom_opt.index.names
-):
-    caps_final_comparison.loc["Stochastic API"] = net_stoch.generators.p_nom_opt.xs(
-        "med", level="scenario"
-    )
-else:
-    caps_final_comparison.loc["Stochastic API"] = net_stoch.generators.p_nom_opt
+caps_final_comparison.loc["Stochastic API"] = caps_api
 caps_final_comparison.loc["Stochastic Manual"] = caps_manual_stoch
 
 objs_final_comparison = objs_det.copy()
