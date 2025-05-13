@@ -100,7 +100,8 @@ ts = pd.read_csv(TS_URL, index_col=0, parse_dates=True)
 ts = ts.resample(FREQ).asfreq()
 
 
-# Step 3: Deterministic Network Builder & Run
+###########################################
+# Step 3: Build toy network & run deterministic scenarios
 def build_network(gas_price):
     """
     Create PyPSA network:
@@ -148,6 +149,26 @@ for sc in SCENARIOS:
     caps_det.loc[sc] = n.generators.p_nom_opt
     objs_det.loc[sc] = n.objective
 
+
+"""
+Linopy LP model
+===============
+
+Variables:
+----------
+ * Generator-p_nom (Generator-ext)
+ * Generator-p (snapshot, Generator)
+
+Constraints:
+------------
+ * Generator-ext-p_nom-lower (Generator-ext)
+ * Generator-ext-p_nom-upper (Generator-ext)
+ * Generator-ext-p-lower (snapshot, Generator-ext)
+ * Generator-ext-p-upper (snapshot, Generator-ext)
+ * Bus-nodal_balance (Bus, snapshot)
+
+"""
+
 # Step 4: Plot Deterministic Results
 plot_capacity(caps_det, title="Deterministic Capacity Mix")
 plt.show()
@@ -155,9 +176,27 @@ plt.show()
 plot_cost(objs_det, title="Deterministic Total Cost")
 plt.show()
 
-# Step 5: PyPSA API Stochastic Run
+
+###########################################
+# Step 5: Build stochastic network with PyPSA API
+
 n_stoch = build_network(GAS_PRICES[BASE])
+
+# Adding scenarios & probabilities to the network are super easy
 n_stoch.set_scenarios(PROB)
+
+"""
+Unnamed Stochastic PyPSA Network
+--------------------------------
+Components:
+ - Bus: 3
+ - Generator: 12
+ - Load: 3
+Snapshots: 2920
+Scenarios: 3
+"""
+
+# Set data that is varying by scenario
 for sc in SCENARIOS:
     if sc != BASE:
         idx = (sc, "gas")
@@ -168,6 +207,24 @@ for sc in SCENARIOS:
 n_stoch.optimize(solver_name=SOLVER)
 caps_api = n_stoch.generators.p_nom_opt.xs("med", level="scenario")
 obj_api = n_stoch.objective
+
+"""
+Linopy LP model
+===============
+
+Variables:
+----------
+ * Generator-p_nom (component)
+ * Generator-p (scenario, component, snapshot)
+
+Constraints:
+------------
+ * Generator-ext-p_nom-lower (component, scenario)
+ * Generator-ext-p-lower (scenario, component, snapshot)
+ * Generator-ext-p-upper (scenario, component, snapshot)
+ * Bus-nodal_balance (component, scenario, snapshot)
+
+"""
 
 # Step 6: Plot API Stochastic Results
 caps_all = caps_det.copy()
@@ -180,7 +237,9 @@ objs_all.loc["Stochastic API"] = obj_api
 plot_cost(objs_all, title="Total Cost: Deterministic + Stochastic")
 plt.show()
 
-# Step 7: Let's manually formulate stochastic problem using linopy
+###########################################
+# Step 7: Let's manually formulate stochastic problem to reproduce the results
+
 from pypsa.components.common import as_components
 from linopy.expressions import merge
 
@@ -225,6 +284,32 @@ def add_stochastic(n):
 
 n_manual_stoch = build_network(GAS_PRICES["low"])
 add_stochastic(n_manual_stoch)
+
+"""
+Linopy LP model
+===============
+
+Variables:
+----------
+ * Generator-p_nom (component)
+ * Generator-p (snapshot, component)
+ * Generator-p-med (snapshot, component)
+ * Generator-p-high (snapshot, component)
+
+Constraints:
+------------
+ * Generator-ext-p_nom-lower (component)
+ * Generator-ext-p-lower (snapshot, component)
+ * Generator-ext-p-upper (snapshot, component)
+ * Bus-nodal_balance (component, snapshot)
+ * Generator-ext-p-upper-med (snapshot, component)
+ * Generator-ext-p-lower-med (snapshot, component)
+ * Bus-nodal-med (Bus, component, snapshot)
+ * Generator-ext-p-upper-high (snapshot, component)
+ * Generator-ext-p-lower-high (snapshot, component)
+ * Bus-nodal-high (Bus, component, snapshot)
+"""
+
 n_manual_stoch.optimize.solve_model(solver_name=SOLVER)
 caps_manual_stoch = n_manual_stoch.generators.p_nom_opt
 obj_manual_stoch = n_manual_stoch.objective
