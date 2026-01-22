@@ -1,0 +1,112 @@
+run:
+  name: "aegis_presolve_lv"
+
+scenario:
+  clusters: [256]
+  opts: [""]
+  sector_opts: [""]
+  planning_horizons: [2030]
+
+transmission_projects:
+  enable: false
+
+lines:
+  under_construction: remove
+  dynamic_line_rating:
+    activate: false
+
+links:
+  under_construction: remove
+
+countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MD', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'UA', 'XK']
+
+snapshots:
+  start: "2013-04-01"
+  end: "2013-04-05"
+  inclusive: 'left'
+
+costs:
+  year: 2020
+  emission_prices:
+    enable: true
+    co2: 85
+
+electricity:
+  voltages: [63., 66., 90., 110., 132., 150., 220., 300., 330., 380., 400., 500., 750.]
+  base_network: osm
+  estimate_renewable_capacities:
+    year: 2024
+  extendable_carriers:
+    Generator: []
+    Store: []
+  renewable_carriers:
+    - solar
+    - onwind
+    - offwind-ac
+    - hydro
+  conventional_carriers:
+    - nuclear
+    - oil
+    - OCGT
+    - CCGT
+    - coal
+    - lignite
+    - geothermal
+    - biomass
+transmission_limit: v1.0
+powerplants_filter: (DateOut >= 2025 or DateOut != DateOut) and (DateIn <= 2025 or DateIn != DateIn)
+
+hydro:
+  flatten_dispatch: true
+
+conventional:
+  nuclear:
+    p_max_pu: "data/nuclear_p_max_pu.csv"
+    p_min_pu: "data/nuclear_p_max_pu.csv"
+
+clustering:
+  exclude_carriers:
+    - nuclear
+    - coal
+    - lignite
+    - OCGT
+    - CCGT
+
+sector:
+  gas_network: true
+  regional_co2_sequestration_potential:
+    enable: true
+  co2_spatial: true
+  co2_network: true
+  biomass_spatial: true
+  biomass_transport: false
+  regional_oil_demand: true
+
+atlite:
+  nprocesses: 12
+
+data:
+  wdpa:
+    source: archive
+    version: latest
+  wdpa_marine:
+    source: archive
+    version: latest
+  osm:
+    source: build
+    version: unknown
+
+overpass_api:
+  url: https://overpass.osm.jp/api/interpreter
+  max_tries: 5
+  timeout: 600
+  user_agent:
+    project_name: PyPSA-Eur
+    email: contact@pypsa.org
+    website: https://github.com/PyPSA/pypsa-eur
+
+solving:
+  solver_options:
+    gurobi-default:
+      threads: 8
+      BarConvTol: 5.e-5
